@@ -16,17 +16,23 @@ resource "google_compute_network" "main" {
 }
 
 ###############################
-# 2. Subnet
+# 2. Subnet (with Flow Logs)
 ###############################
 resource "google_compute_subnetwork" "main" {
   name          = "dev-subnet"
   ip_cidr_range = "10.0.1.0/24"
   region        = var.gcp_region
   network       = google_compute_network.main.id
+
+  log_config {
+    aggregation_interval = "INTERVAL_1_MIN"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
 }
 
 ###############################
-# 3. Route (Internet access)
+# 3. Internet Route
 ###############################
 resource "google_compute_route" "default_internet" {
   name             = "default-internet-route"
@@ -51,7 +57,7 @@ resource "google_compute_firewall" "ssh" {
 }
 
 ###############################
-# 5. Generate SSH Key Pair
+# 5. SSH Key Pair
 ###############################
 resource "tls_private_key" "example" {
   algorithm = "RSA"
@@ -59,7 +65,7 @@ resource "tls_private_key" "example" {
 }
 
 ###############################
-# 6. Compute Instance
+# 6. Compute Engine VM
 ###############################
 resource "google_compute_instance" "vm" {
   name         = "crm-vm"
@@ -75,68 +81,35 @@ resource "google_compute_instance" "vm" {
   network_interface {
     subnetwork = google_compute_subnetwork.main.id
 
-    access_config {} # gives external IP
+    access_config {} # assigns external IP
   }
 
   metadata = {
-    ssh-keys = "terraform:${tls_private_key.example.public_key_openssh}"
+    ssh-keys = "debian:${tls_private_key.example.public_key_openssh}"
   }
 
   tags = ["ssh"]
 }
 
 ###############################
-# 7. Random suffix
+# 7. Local private key file
 ###############################
-resource "random_id" "suffix" {
-  byte_length = 4
-}
-
-###############################
-# 8. Storage Bucket (S3 equivalent)
-###############################
-resource "google_storage_bucket" "flow_logs_bucket" {
-  name     = "my-flow-logs-bucket-${random_id.suffix.hex}"
-  location = var.gcp_region
-
-  uniform_bucket_level_access = true
-}
-
-###############################
-# 9. Enable VPC Flow Logs (on subnet)
-###############################
-resource "google_compute_subnetwork" "main_with_logs" {
-  name          = "dev-subnet-logs"
-  ip_cidr_range = "10.0.2.0/24"
-  region        = var.gcp_region
-  network       = google_compute_network.main.id
-
-  log_config {
-    aggregation_interval = "INTERVAL_1_MIN"
-    flow_sampling        = 0.5
-    metadata             = "INCLUDE_ALL_METADATA"
-  }
-}
-
-###############################
-# 10. Save private key locally
-###############################
-resource "local_file" "private_key_pem" {
+resource "local_file" "private_key" {
   content         = tls_private_key.example.private_key_pem
   filename        = "${path.module}/my-keypair.pem"
-  file_permission = "0600"
+  file_permission = "0400"
 }
 
 ###############################
-# 11. Post setup
+# 8. Optional post-check
 ###############################
 resource "null_resource" "post_setup" {
   provisioner "local-exec" {
-    command = "echo Private key saved at my-keypair.pem"
+    command = "echo VM deployed with SSH key saved locally"
   }
 
   depends_on = [
     google_compute_instance.vm,
-    local_file.private_key_pem
+    local_file.private_key
   ]
 }
