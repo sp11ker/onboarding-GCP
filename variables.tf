@@ -1,9 +1,29 @@
-variable "aws_region" {
-  default = "us-east-1"
+variable "gcp_project" {
+  description = "GCP project ID"
+  type        = string
 }
 
-variable "ami_id" {
-  default = "ami-0e95a5e2743ec9ec9"  # Amazon Linux 2 in us-east-1
+variable "gcp_region" {
+  description = "GCP region"
+  default     = "europe-west2"
 }
 
-# the eu-north-1 ami = default = "ami-09dd028259b833925"  # Amazon Linux 2 in eu-north-1
+variable "gcp_zone" {
+  description = "GCP zone"
+  default     = "europe-west2-a"
+}
+
+variable "machine_type" {
+  description = "VM machine type"
+  default     = "e2-micro"
+}
+
+variable "image_family" {
+  description = "GCP image family"
+  default     = "debian-11"
+}
+
+variable "image_project" {
+  description = "GCP image project"
+  default     = "debian-cloud"
+}
